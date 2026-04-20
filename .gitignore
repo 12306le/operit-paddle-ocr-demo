@@ -1,0 +1,34 @@
+# Android / Gradle
+.gradle/
+build/
+/local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild
+
+# CMake / NDK build 中间产物
+app/.cxx/
+app/build/
+app/cache/
+
+# 从百度 CDN 自动下载,不跟进 git (约 400MB)
+app/PaddleLite/
+app/OpenCV/
+app/src/main/assets/models/ocr_v1_for_cpu/*.nb
+
+# 编译产物
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+hs_err_pid*
+
+# 签名
+*.jks
+!debug.keystore
+
+# 日志
+*.log
