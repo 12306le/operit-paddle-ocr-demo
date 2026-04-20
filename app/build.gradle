@@ -4,6 +4,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 29
+    ndkVersion "20.1.5948944"  // 强制使用 NDK 20 以匹配 Paddle-Lite v2.6 .so 的 ABI
     defaultConfig {
         applicationId "com.baidu.paddle.lite.demo.ocr"
         minSdkVersion 23
