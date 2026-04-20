@@ -7,9 +7,15 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# runner 上自带 Android SDK,不用 android-actions/setup-android
+# (那个 action 依赖的 cmdline-tools 最新版需要 JDK 17,但我们必须用 JDK 11 兼容 AGP 4.0.1)
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      # 绕过 sdkmanager 的 JDK 版本检查,允许用 JDK 11 装 NDK
+      SKIP_JDK_VERSION_CHECK: "true"
 
     steps:
       - name: Checkout
@@ -22,32 +28,49 @@ jobs:
           java-version: '11'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          api-level: 29
-
-      - name: Install NDK r20b
+      - name: Install NDK 20.1 & CMake 3.10.2 (用 runner 预装 SDK)
         run: |
-          cd "$ANDROID_HOME"
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;20.1.5948944" "cmake;3.10.2.4988404" | tail -5
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/20.1.5948944" >> $GITHUB_ENV
+          set -e
+          export ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          echo "Using ANDROID_HOME=$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-29" \
+            "build-tools;29.0.3" \
+            "ndk;20.1.5948944" \
+            "cmake;3.10.2.4988404" | tail -5
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/20.1.5948944" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/20.1.5948944" >> $GITHUB_ENV
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Pre-download Paddle/OpenCV/model archives (~300MB)
+      - name: Show environment
         run: |
-          ./gradlew :app:downloadAndExtractArchives --no-daemon --stacktrace
-        continue-on-error: true
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/ndk/"
+          ./gradlew --version
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: paddle-ocr-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
+
+      - name: Upload build logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            app/build/
+            /tmp/*.txt
+          retention-days: 7
